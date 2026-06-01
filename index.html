@@ -100,7 +100,7 @@ function azInsert(table,entity){
   return fetch(AZ_BASE+'/'+table+AZ_SAS,{method:'POST',headers:AZ_HDR,body:JSON.stringify(entity)}).then(function(r){return r.ok;}).catch(function(){return false;});
 }
 function azUpsert(table,entity){
-  return fetch(azUrl(table,entity.PartitionKey,entity.RowKey),{method:'PUT',headers:AZ_HDR_IF,body:JSON.stringify(entity)}).then(function(r){return r.ok;}).catch(function(){return false;});
+  return fetch(azUrl(table,entity.PartitionKey,entity.RowKey),{method:'PUT',headers:AZ_HDR,body:JSON.stringify(entity)}).then(function(r){return r.ok;}).catch(function(){return false;});
 }
 function azDel(table,pk,rk){
   return fetch(azUrl(table,pk,rk),{method:'DELETE',headers:AZ_HDR_IF}).then(function(r){return r.ok;}).catch(function(){return false;});
@@ -610,17 +610,24 @@ function buildPickBreakdown(picks,tiebreaker,results){
     html+='<div style="background:white;border-radius:7px;padding:5px 7px;border:1px solid #e2e8f0">'
       +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:9px;font-weight:800;color:#64748b;letter-spacing:.5px"><span>GRP '+g+'</span>'
       +(pts!=null?'<span style="color:'+(pts>=13?'#059669':pts>=6?'#d97706':'#ef4444')+'">'+pts+'pt</span>':'')+'</div>'
-      +(p1?pickLine(p1,'1ST',af,hasRes):'')+(p2?pickLine(p2,'2ND',as_,hasRes):'')+'</div>';
+      +(p1?pickLine(p1,'1ST',af,as_,hasRes):'')+(p2?pickLine(p2,'2ND',af,as_,hasRes):'')+'</div>';
   });
   html+='</div><div style="font-size:10px;color:#64748b">⚖ TB guess: <strong>'+tiebreaker+'</strong>'+(tg!=null?' · actual: '+tg+' · diff: ±'+Math.abs(tiebreaker-tg):'')+'</div></div>';
   return html;
 }
-function pickLine(team,label,actual,hr){
-  var ok=hr&&actual&&team===actual,bad=hr&&actual&&team!==actual;
+function pickLine(team,label,af,as_,hr){
+  var hasResult=hr&&af&&as_;
+  var exact=hasResult&&((label==='1ST'&&team===af)||(label==='2ND'&&team===as_));
+  var partial=hasResult&&!exact&&(team===af||team===as_);
+  var bad=hasResult&&!exact&&!partial;
+  var color=exact?'#059669':partial?'#d97706':bad?'#ef4444':'#334155';
+  var icon=exact?'\u2713 ':partial?'\u21c4 ':bad?'\u2717 ':'';
+  var decoration=bad?'line-through':'none';
+  var note=partial?(' ('+(label==='1ST'?'2nd':'1st')+')'):'';
   return '<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px;font-size:9px">'
     +'<span style="font-size:8px;font-weight:800;color:'+(label==='1ST'?'#d97706':'#4f46e5')+';min-width:20px">'+label+'</span>'
     +'<span style="font-size:12px">'+FLAGS[team]+'</span>'
-    +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(ok?'#059669':bad?'#ef4444':'#334155')+';text-decoration:'+(bad?'line-through':'none')+'">'+(ok?'✓ ':bad?'✗ ':'')+esc(team)+'</span></div>';
+    +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+color+';text-decoration:'+decoration+'">'+icon+esc(team)+note+'</span></div>';
 }
 
 /* ── ADMIN ── */
