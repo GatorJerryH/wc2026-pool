@@ -131,7 +131,7 @@ var FIFA_LOGO = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA0QAAAP
 
 /* ── STATE ── */
 var S={
-  view:"submit",subs:[],results:null,
+  view:"home",subs:[],results:null,
   picks:{},form:{entryName:"",participantName:"",email:"",tiebreaker:""},
   submitDone:false,submitErr:"",
   adminTab:"results",draftR:null,
@@ -377,9 +377,90 @@ function buildApp(){
       +'<li>Drag the updated file to <strong>app.netlify.com/drop</strong> to host it</li>'
       +'</ol></div></div>';
   }
+  if(S.view==="home")return buildHome();
   if(S.view==="submit")return buildHeader()+buildSubmit();
   if(S.view==="leaderboard")return buildHeader()+buildLeaderboard();
   return buildHeader()+'<div class="single-col">'+buildAdmin()+'</div>';
+}
+
+
+/* ── HOME / COVER PAGE ─────────────────────────────────────────── */
+function buildHome(){
+  var dl=timeUntilDeadline();
+  var deadlineMsg=isPastDeadline()?'Pool play has begun — submissions are now closed.':dl?'Picks deadline: June 11 at 3:00 PM ET ('+dl+')':'';
+  return '<div style="min-height:100vh;background:#0a0f1e;font-family:system-ui,sans-serif">'
+
+    /* ── Hero ── */
+    +'<div style="background:linear-gradient(135deg,#0a0f1e 0%,#1e3a5f 60%,#0a3d2e 100%);padding:40px 20px 32px;text-align:center;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;inset:0;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.025) 0,rgba(255,255,255,.025) 1px,transparent 0,transparent 50%);background-size:22px 22px"></div>'
+    +'<div style="position:relative">'
+    +'<div style="font-size:48px;margin-bottom:8px">⚽</div>'
+    +'<div style="font-size:10px;letter-spacing:4px;color:#94a3b8;font-weight:700;margin-bottom:6px">ENTERPRISE PLATFORMS · FIFA</div>'
+    +'<div style="font-size:38px;font-weight:900;color:white;letter-spacing:1px;line-height:1;margin-bottom:4px">WORLD CUP</div>'
+    +'<div style="font-size:52px;font-weight:900;color:#fbbf24;letter-spacing:2px;line-height:1;margin-bottom:8px">2026</div>'
+    +'<div style="font-size:13px;font-weight:700;color:#86efac;letter-spacing:3px;margin-bottom:16px">USA · CANADA · MEXICO</div>'
+    +(deadlineMsg?'<div style="display:inline-block;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:99px;padding:6px 18px;font-size:12px;font-weight:700;color:#fbbf24;letter-spacing:.5px">⏰ '+deadlineMsg+'</div>':'')
+    +'</div></div>'
+
+    /* ── Body ── */
+    +'<div style="max-width:680px;margin:0 auto;padding:28px 16px 40px">'
+
+    /* Section 1: Win Prizes */
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#94a3b8;margin-bottom:12px;padding-left:2px">🏆 TWO WAYS TO WIN PRIZES</div>'
+
+    /* Card 1: Pick'em Pool */
+    +'<div style="background:linear-gradient(135deg,#1e3a5f,#0f2040);border:1px solid rgba(251,191,36,.3);border-radius:14px;padding:20px;margin-bottom:12px;cursor:pointer;transition:transform .15s" onclick="S.view=\'submit\';render()">'
+    +'<div style="display:flex;align-items:flex-start;gap:14px">'
+    +'<div style="font-size:36px;flex-shrink:0">📝</div>'
+    +'<div style="flex:1">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    +'<span style="font-size:17px;font-weight:900;color:white;letter-spacing:.5px">GROUP STAGE PICK\'EM POOL</span>'
+    +'<span style="background:#fbbf24;color:#0a0f1e;font-size:9px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:99px">INTERNAL</span>'
+    +'</div>'
+    +'<p style="font-size:13px;color:#94a3b8;line-height:1.6;margin:0 0 12px">Pick the 1st and 2nd place finisher for all 12 groups before pool play kicks off. Prizes will be awarded to the <strong style="color:#fbbf24">top three finishers</strong> on the final leaderboard.</p>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="event.stopPropagation();S.view=\'submit\';render()" style="background:#fbbf24;color:#0a0f1e;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:.5px;font-family:inherit">📝 SUBMIT YOUR PICKS</button>'
+    +'<button onclick="event.stopPropagation();S.view=\'leaderboard\';render()" style="background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px;font-family:inherit">🏆 LEADERBOARD</button>'
+    +'</div></div></div></div>'
+
+    /* Card 2: ESPN Knockout Bracket */
+    +'<div style="background:linear-gradient(135deg,#1a1a3e,#0f1020);border:1px solid rgba(99,102,241,.4);border-radius:14px;padding:20px;margin-bottom:24px;cursor:pointer" onclick="window.open(\'https://fantasy.espn.com/games/mens-knockout-bracket-challenge-2026/group?id=4f49cedf-7be5-4d04-9148-31cb03825d76\',\'_blank\')">'
+    +'<div style="display:flex;align-items:flex-start;gap:14px">'
+    +'<div style="font-size:36px;flex-shrink:0">🗂️</div>'
+    +'<div style="flex:1">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    +'<span style="font-size:17px;font-weight:900;color:white;letter-spacing:.5px">ESPN KNOCKOUT BRACKET</span>'
+    +'<span style="background:#6366f1;color:white;font-size:9px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:99px">ESPN</span>'
+    +'</div>'
+    +'<p style="font-size:13px;color:#94a3b8;line-height:1.6;margin:0 0 12px">Join the EP group on ESPN\'s Men\'s Knockout Bracket Challenge. Pick your bracket for the knockout stages and compete for additional prizes.</p>'
+    +'<a href="https://fantasy.espn.com/games/mens-knockout-bracket-challenge-2026/group?id=4f49cedf-7be5-4d04-9148-31cb03825d76" target="_blank" style="display:inline-block;background:#6366f1;color:white;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.5px">🗂️ JOIN ESPN GROUP</a>'
+    +'</div></div></div>'
+
+    /* Section 2: More Info */
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#94a3b8;margin-bottom:12px;padding-left:2px">ℹ️ COX WORLD CUP INFORMATION</div>'
+
+    /* Card 3: Merch Store */
+    +'<div style="background:linear-gradient(135deg,#1a2e1a,#0f1f0f);border:1px solid rgba(134,239,172,.3);border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer" onclick="window.open(\'https://store.coxenterprises.com/world-cup-merch/\',\'_blank\')">'
+    +'<div style="display:flex;align-items:center;gap:14px">'
+    +'<div style="font-size:32px;flex-shrink:0">👕</div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:15px;font-weight:800;color:white;margin-bottom:4px">WORLD CUP MERCH</div>'
+    +'<p style="font-size:12px;color:#94a3b8;line-height:1.5;margin:0 0 10px">Gear up for the tournament — check out the Cox Enterprises World Cup merchandise store.</p>'
+    +'<a href="https://store.coxenterprises.com/world-cup-merch/" target="_blank" style="display:inline-block;background:#86efac;color:#0f1f0f;border-radius:8px;padding:7px 16px;font-size:11px;font-weight:800;text-decoration:none;letter-spacing:.5px">👕 SHOP NOW</a>'
+    +'</div></div></div>'
+
+    /* Card 4: Cox SharePoint World Cup page */
+    +'<div style="background:linear-gradient(135deg,#1e1a0f,#0f1005);border:1px solid rgba(251,191,36,.2);border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer" onclick="window.open(\'https://coxinc.sharepoint.com/sites/InsideCox-AtlantaHQ/SitePages/World-Cup.aspx\',\'_blank\')">'
+    +'<div style="display:flex;align-items:center;gap:14px">'
+    +'<div style="font-size:32px;flex-shrink:0">🎉</div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:15px;font-weight:800;color:white;margin-bottom:4px">WATCH PARTIES & MORE</div>'
+    +'<p style="font-size:12px;color:#94a3b8;line-height:1.5;margin:0 0 10px">Play with purpose — find out everything Cox Enterprises has planned for the World Cup including watch parties and events.</p>'
+    +'<a href="https://coxinc.sharepoint.com/sites/InsideCox-AtlantaHQ/SitePages/World-Cup.aspx" target="_blank" style="display:inline-block;background:#fbbf24;color:#0f1005;border-radius:8px;padding:7px 16px;font-size:11px;font-weight:800;text-decoration:none;letter-spacing:.5px">🎉 LEARN MORE</a>'
+    +'</div></div></div>'
+
+    +'<div style="text-align:center;margin-top:24px;font-size:11px;color:#475569;letter-spacing:1px">ENTERPRISE PLATFORMS · FIFA WORLD CUP 2026 · JUNE 11 – JULY 19</div>'
+    +'</div></div>';
 }
 
 function buildHeader(){
@@ -394,6 +475,7 @@ function buildHeader(){
     +'<div style="flex:1;text-align:right"><div style="font-size:24px;font-weight:900;color:#fbbf24;line-height:1">'+S.subs.length+'</div>'
     +'<div style="font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:1px">ENTRIES</div></div></div>'
     +'<div style="display:flex">'
+    +'<button data-action="view" data-v="home" style="padding:7px 14px;background:transparent;border:none;cursor:pointer;font-size:18px;font-weight:700;letter-spacing:1.5px;color:'+(S.view==="home"?'white':'rgba(255,255,255,.4)')+';border-bottom:'+(S.view==="home"?'3px solid #fbbf24':'3px solid transparent')+'">🏠</button>'
     +['submit','leaderboard'].map(function(v){var a=S.view===v;return'<button data-action="view" data-v="'+v+'" style="flex:1;padding:7px 0;background:transparent;border:none;cursor:pointer;font-size:20px;font-weight:700;letter-spacing:1.5px;color:'+(a?'white':'rgba(255,255,255,.4)')+';border-bottom:'+(a?'3px solid #fbbf24':'3px solid transparent')+'">'+(v==='submit'?'📝  MAKE PICKS':'🏆  LEADERBOARD')+'</button>';}).join('')
     +'</div></div></div>';
 }
