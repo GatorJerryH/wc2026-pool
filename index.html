@@ -671,7 +671,9 @@ function buildAdminResults(){
     +(allGoals>0?' <span style="color:#94a3b8">📊 All game scores sum: <strong>'+allGoals+'</strong> goals.</span>':'')+'</p>'
     +'<label style="'+lbl()+'">ACTUAL TOTAL GOALS BY 32 QUALIFYING TEAMS</label>'
     +'<input id="a-totalGoals" type="number" min="0" placeholder="e.g. 85" style="'+inp('max-width:170px')+'" oninput="S.draftR.totalGoals=this.value"></div>'
-    +'<button data-action="save-results" style="'+btn('#059669','width:100%;padding:13px;font-size:13px;letter-spacing:1px')+'">'+(S.adminSaved?'✅  RESULTS SAVED — SCORES UPDATED':'SAVE ALL RESULTS & CALCULATE SCORES')+'</button>';
+    +'<div style="position:sticky;bottom:0;z-index:50;padding:10px 0 4px;background:linear-gradient(to bottom,transparent 0%,white 30%)">'
+    +'<button data-action="save-results" style="'+btn(S.adminSaved?'#059669':'#0f172a','width:100%;padding:13px;font-size:13px;letter-spacing:1px')+'">'+(S.adminSaved?'✅  RESULTS SAVED — SCORES UPDATED':'💾  SAVE ALL RESULTS & CALCULATE SCORES')+'</button>'
+    +'</div>';
   return html;
 }
 
