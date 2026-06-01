@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FIFA World Cup 2026 – Pick'em Pool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh}
+.fade{animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+input:focus{outline:none;box-shadow:0 0 0 2px rgba(30,58,95,.3)}
+button:focus{outline:none}
+.tbtn{transition:all .12s ease}
+.tbtn:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"><div style="text-align:center;padding:80px;color:#94a3b8;font-size:18px">⚽ Loading...</div></div>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   FIFA 2026 WORLD CUP PICK'EM POOL
+   Admin Password: worldcup2026
+   Scoring: Winner=5pts | Runner-up=3pts | Winner pick finishes 2nd=3pts | Both correct in order=+5 bonus
+   Max per group: 13pts | Max total: 156pts
+   Tiebreaker: Closest guess to total goals by 32 qualifying teams
+═══════════════════════════════════════════════════════════ */
+
+var GROUPS={A:["Mexico","South Korea","South Africa","Czechia"],B:["Canada","Switzerland","Qatar","Bosnia-Herzegovina"],C:["Brazil","Morocco","Scotland","Haiti"],D:["USA","Paraguay","Australia","Turkey"],E:["Germany","Curaçao","Ivory Coast","Ecuador"],F:["Netherlands","Japan","Tunisia","Sweden"],G:["Belgium","Egypt","Iran","New Zealand"],H:["Spain","Cape Verde","Saudi Arabia","Uruguay"],I:["France","Senegal","Norway","Iraq"],J:["Argentina","Algeria","Austria","Jordan"],K:["Portugal","Colombia","Uzbekistan","DR Congo"],L:["England","Croatia","Ghana","Panama"]};
+var GL=["A","B","C","D","E","F","G","H","I","J","K","L"];
+var FLAGS={"Mexico":"🇲🇽","South Korea":"🇰🇷","South Africa":"🇿🇦","Czechia":"🇨🇿","Canada":"🇨🇦","Switzerland":"🇨🇭","Qatar":"🇶🇦","Bosnia-Herzegovina":"🇧🇦","Brazil":"🇧🇷","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Haiti":"🇭🇹","USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Turkey":"🇹🇷","Germany":"🇩🇪","Curaçao":"🇨🇼","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨","Netherlands":"🇳🇱","Japan":"🇯🇵","Tunisia":"🇹🇳","Sweden":"🇸🇪","Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿","Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾","France":"🇫🇷","Senegal":"🇸🇳","Norway":"🇳🇴","Iraq":"🇮🇶","Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴","Portugal":"🇵🇹","Colombia":"🇨🇴","Uzbekistan":"🇺🇿","DR Congo":"🇨🇩","England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦"};
+var ADMIN_PW="worldcup2026",SK_SUBS="wc2026v2_subs",SK_RES="wc2026v2_results";
+
+/* ── SUBMISSION DEADLINE ──────────────────────────────────────────
+   Picks lock at kick-off of the first game: June 11, 2026 3:00 PM ET
+   (19:00 UTC — Eastern Daylight Time is UTC-4 in June)
+────────────────────────────────────────────────────────────────── */
+var DEADLINE = new Date('2026-06-11T19:00:00Z');
+function isPastDeadline(){ return new Date() >= DEADLINE; }
+function timeUntilDeadline(){
+  var diff = DEADLINE - new Date();
+  if(diff <= 0) return null;
+  var d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000),
+      m=Math.floor((diff%3600000)/60000);
+  if(d>0) return d+'d '+h+'h remaining';
+  if(h>0) return h+'h '+m+'m remaining';
+  return m+'m remaining';
+}
+
+
+/* ── STATE ── */
+var S={
+  view:"submit",subs:[],results:null,
+  picks:{},form:{entryName:"",participantName:"",email:"",tiebreaker:""},
+  submitDone:false,submitErr:"",
+  adminTab:"results",draftR:null,
+  expGame:null,expSub:null,expLb:null,
+  lbAdminMode:false,adminPW:"",adminPWErr:"",adminSaved:false
+};
+function initPicks(){var p={};GL.forEach(function(g){p[g]=[];});return p;}
+S.picks=initPicks();
+
+/* ── RESULTS HELPERS ── */
+function makeMatchups(g){
+  var t=GROUPS[g],m=[];
+  for(var i=0;i<4;i++)for(var j=i+1;j<4;j++)m.push({t1:t[i],t2:t[j],s1:"",s2:""});
+  return m;
+}
+function initResults(){
+  var groups={},games={};
+  GL.forEach(function(g){groups[g]={first:null,second:null};games[g]=makeMatchups(g);});
+  return{groups:groups,games:games,totalGoals:""};
+}
+function loadResults(raw){
+  if(!raw)return initResults();
+  if(!raw.groups){
+    var r=initResults();
+    GL.forEach(function(g){if(raw[g])r.groups[g]={first:raw[g][0]||null,second:raw[g][1]||null};});
+    return r;
+  }
+  var base=initResults();
+  GL.forEach(function(g){
+    if(raw.groups[g])base.groups[g]=raw.groups[g];
+    if(raw.games&&raw.games[g])base.games[g]=raw.games[g];
+  });
+  base.totalGoals=raw.totalGoals||"";
+  return base;
+}
+
+/* ── SCORING ── */
+function calcScore(picks,results){
+  if(!results||!results.groups)return null;
+  var total=0;
+  GL.forEach(function(g){
+    var pp=picks[g]||[],p1=pp[0],p2=pp[1];
+    var grp=results.groups[g]||{},af=grp.first,as_=grp.second;
+    if(!af||!as_)return;
+    if(p1===af)total+=5;else if(p1===as_)total+=3;
+    if(p2===as_)total+=3;
+    if(p1===af&&p2===as_)total+=5;
+  });
+  return total;
+}
+function groupPts(picks,g,results){
+  var pp=picks[g]||[],p1=pp[0],p2=pp[1];
+  var grp=(results&&results.groups&&results.groups[g])||{},af=grp.first,as_=grp.second;
+  if(!af||!as_)return null;
+  var pts=0;
+  if(p1===af)pts+=5;else if(p1===as_)pts+=3;
+  if(p2===as_)pts+=3;
+  if(p1===af&&p2===as_)pts+=5;
+  return pts;
+}
+function getTG(results){
+  if(results&&results.totalGoals!=null&&results.totalGoals!=="")return Number(results.totalGoals);
+  return null;
+}
+function rankEntries(subs,results){
+  var tg=getTG(results);
+  return subs.slice().map(function(s){
+    return Object.assign({},s,{score:calcScore(s.picks,results),tbDiff:tg!=null?Math.abs(Number(s.tiebreaker)-tg):null});
+  }).sort(function(a,b){
+    if((b.score||0)!==(a.score||0))return(b.score||0)-(a.score||0);
+    if(a.tbDiff!=null&&b.tbDiff!=null&&a.tbDiff!==b.tbDiff)return a.tbDiff-b.tbDiff;
+    return new Date(a.timestamp)-new Date(b.timestamp);
+  });
+}
+
+/* ── STORAGE ── */
+var store=(function(){
+  var ws=typeof window!=="undefined"&&window.storage;
+  return{
+    get:function(k,sh){return ws?ws.get(k,sh).catch(function(){return null;}):Promise.resolve((function(){try{var v=localStorage.getItem(k);return v?{value:v}:null;}catch(e){return null;}})());},
+    set:function(k,v,sh){if(ws)return ws.set(k,v,sh).catch(function(){});try{localStorage.setItem(k,v);}catch(e){}return Promise.resolve();}
+  };
+})();
+
+function loadData(){
+  Promise.all([store.get(SK_SUBS,true),store.get(SK_RES,true)]).then(function(res){
+    var sr=res[0],rr=res[1];
+    if(sr&&sr.value)try{S.subs=JSON.parse(sr.value);}catch(e){}
+    S.results=loadResults(rr&&rr.value?JSON.parse(rr.value):null);
+    S.draftR=JSON.parse(JSON.stringify(S.results));
+    render();
+  }).catch(function(){
+    S.results=initResults();
+    S.draftR=JSON.parse(JSON.stringify(S.results));
+    render();
+  });
+}
+function writeSubs(){return store.set(SK_SUBS,JSON.stringify(S.subs),true);}
+function writeResults(){
+  return store.set(SK_RES,JSON.stringify(S.draftR),true).then(function(){
+    S.results=JSON.parse(JSON.stringify(S.draftR));
+  });
+}
+
+/* ── RENDER ── */
+function render(){
+  document.getElementById("root").innerHTML=buildApp();
+  restoreInputs();
+}
+function restoreInputs(){
+  function sv(id,v){var el=document.getElementById(id);if(el)el.value=v==null?"":v;}
+  sv("f-entryName",S.form.entryName);
+  sv("f-participantName",S.form.participantName);
+  sv("f-email",S.form.email);
+  sv("f-tiebreaker",S.form.tiebreaker);
+  sv("a-totalGoals",S.draftR?S.draftR.totalGoals:"");
+  sv("a-pw",S.adminPW);
+  if(S.draftR&&S.draftR.games){
+    GL.forEach(function(g){
+      (S.draftR.games[g]||[]).forEach(function(m,i){
+        sv("gs-"+g+"-"+i+"-s1",m.s1);
+        sv("gs-"+g+"-"+i+"-s2",m.s2);
+      });
+    });
+  }
+}
+
+/* ── HTML: APP SHELL ── */
+function buildApp(){
+  return buildHeader()+'<div style="max-width:720px;margin:0 auto;padding:13px 11px 52px">'+(S.view==="submit"?buildSubmit():S.view==="leaderboard"?buildLeaderboard():buildAdmin())+'</div>';
+}
+
+function buildHeader(){
+  return '<div style="background:linear-gradient(135deg,#0a0f1e,#1e3a5f);color:white;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;inset:0;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.025) 0,rgba(255,255,255,.025) 1px,transparent 0,transparent 50%);background-size:22px 22px"></div>'
+    +'<div style="position:relative;max-width:720px;margin:0 auto;padding:15px 13px 0">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
+    +'<div><div style="font-size:9px;letter-spacing:3px;color:#94a3b8;margin-bottom:2px;font-weight:600">⚽ FIFA WORLD CUP</div>'
+    +'<div style="font-size:24px;font-weight:900;letter-spacing:1px;line-height:1">2026 PICK\'EM POOL</div>'
+    +'<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:#fbbf24;margin-top:2px">USA · CANADA · MEXICO</div></div>'
+    +'<div style="text-align:right"><div style="font-size:26px;font-weight:900;color:#fbbf24;line-height:1">'+S.subs.length+'</div>'
+    +'<div style="font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:1px">ENTRIES</div></div></div>'
+    +'<div style="display:flex">'
+    +['submit','leaderboard'].map(function(v){
+      var active=S.view===v;
+      return '<button data-action="view" data-v="'+v+'" style="flex:1;padding:8px 0;background:transparent;border:none;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:1.5px;color:'+(active?'white':'rgba(255,255,255,.4)')+';border-bottom:'+(active?'3px solid #fbbf24':'3px solid transparent')+'">'+(v==='submit'?'📝  MAKE PICKS':'🏆  LEADERBOARD')+'</button>';
+    }).join('')
+    +'</div></div></div>';
+}
+
+/* ── HTML: SUBMIT VIEW ── */
+function buildSubmit(){
+  /* Deadline banner */
+  var _dl=timeUntilDeadline();
+  var _deadlineBanner='';
+  if(isPastDeadline()){
+    _deadlineBanner='<div style="background:#fef2f2;border:2px solid #fecaca;border-radius:10px;padding:12px 16px;margin-bottom:9px;text-align:center"><div style="font-size:16px;font-weight:800;color:#dc2626;margin-bottom:4px">🔒 SUBMISSIONS CLOSED</div><div style="font-size:13px;color:#ef4444">Pool play began June 11 at 3:00 PM ET. No new entries can be submitted.</div></div>';
+  } else if(_dl){
+    _deadlineBanner='<div style="background:#fef3c7;border:2px solid #fcd34d;border-radius:10px;padding:10px 16px;margin-bottom:9px;text-align:center"><div style="font-size:14px;font-weight:700;color:#92400e">⏰ DEADLINE: June 11 at 3:00 PM ET &nbsp;·&nbsp; '+_dl+'</div></div>';
+  }
+  if(S.submitDone){
+    return '<div style="text-align:center;padding:60px 16px" class="fade">'
+      +'<div style="font-size:64px;margin-bottom:12px">🎉</div>'
+      +'<div style="font-size:30px;font-weight:900;color:#0f172a;margin-bottom:8px">PICKS SUBMITTED!</div>'
+      +'<p style="color:#64748b;font-size:14px;margin-bottom:24px">Good luck <strong>'+esc(S.form.participantName)+'</strong>!<br>Check the leaderboard once the group stage is complete.</p>'
+      +'<button data-action="new-submit" style="'+btn('#0f172a')+';padding:11px 22px;font-size:13px;margin:0 auto">Submit Another Entry</button></div>';
+  }
+  var completed=GL.filter(function(g){return S.picks[g].length===2;}).length;
+  var pct=(completed/12)*100;
+  var canSub=completed===12&&S.form.entryName.trim()&&S.form.participantName.trim()&&S.form.email.trim();
+  return '<div class="fade">'
+    /* Progress */
+    +_deadlineBanner
+    +'<div style="'+card()+'"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#64748b">PROGRESS</span><span style="font-size:15px;font-weight:800;color:'+(completed===12?'#059669':'#0f172a')+'">'+completed+'<span style="color:#94a3b8;font-weight:600">/12 GROUPS</span></span></div>'
+    +'<div style="background:#e2e8f0;border-radius:99px;height:5px"><div style="background:'+(completed===12?'#059669':'#1e3a5f')+';height:5px;border-radius:99px;width:'+pct+'%"></div></div></div>'
+    /* Entry info */
+    +'<div style="'+card()+'"><div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:10px;border-bottom:1px solid #f1f5f9;padding-bottom:8px">ENTRY INFORMATION</div>'
+    +'<div style="margin-bottom:9px"><label style="'+lbl()+'">ENTRY NAME <span style="color:#dc2626">*</span></label><input id="f-entryName" placeholder="Unique name shown on leaderboard (e.g. Team Awesome)" style="'+inp()+'" oninput="S.form.entryName=this.value"></div>'
+    +'<div style="margin-bottom:9px"><label style="'+lbl()+'">PARTICIPANT NAME <span style="color:#dc2626">*</span></label><input id="f-participantName" placeholder="Your full name" style="'+inp()+'" oninput="S.form.participantName=this.value"></div>'
+    +'<div><label style="'+lbl()+'">EMAIL ADDRESS <span style="color:#dc2626">*</span></label><input id="f-email" type="email" placeholder="your@email.com" style="'+inp()+'" oninput="S.form.email=this.value"></div></div>'
+    /* Scoring guide */
+    +'<div style="background:#0a0f1e;border-radius:12px;padding:12px 14px;margin-bottom:9px;color:white">'
+    +'<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#fbbf24;margin-bottom:7px">📊 SCORING — HOW POINTS ARE EARNED</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:12px;line-height:1.7">'
+    +'<div>🥇 Correct group <strong>winner</strong> → <strong style="color:#fbbf24">5 pts</strong></div>'
+    +'<div>🥈 Correct <strong>runner-up</strong> → <strong style="color:#fbbf24">3 pts</strong></div>'
+    +'<div>🔄 Winner pick finishes <strong>2nd</strong> → <strong style="color:#fbbf24">3 pts</strong></div>'
+    +'<div>✨ <strong>Both</strong> correct in exact order → <strong style="color:#fbbf24">+5 bonus</strong></div>'
+    +'</div><div style="font-size:10px;color:#64748b;margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:6px">Max per group: 13 pts · Max total: 156 pts · Tiebreaker breaks ties</div></div>'
+    /* Groups */
+    +GL.map(function(g){return buildGroupPicker(g,S.picks[g]||[],"pick",false);}).join('')
+    /* Tiebreaker */
+    +'<div style="'+card()+';border:2px solid #fbbf24"><div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">⚖ TIEBREAKER</div>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:9px;line-height:1.5">How many total goals will be scored <em>during group play</em> by the <strong>32 teams that qualify for the knockout stage</strong>? Closest guess breaks ties. Earlier submission wins if still tied.</p>'
+    +'<label style="'+lbl()+'">YOUR GUESS <span style="color:#dc2626">*</span></label>'
+    +'<input id="f-tiebreaker" type="number" min="0" placeholder="e.g. 85" style="'+inp()+';max-width:160px" oninput="S.form.tiebreaker=this.value"></div>'
+    /* Error */
+    +(S.submitErr?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:12px;margin-bottom:9px">'+esc(S.submitErr)+'</div>':'')
+    /* Submit button */
+    +'<button data-action="submit" style="'+btn(canSub?'#059669':'#94a3b8')+';width:100%;padding:14px;font-size:14px;letter-spacing:1px">'
+    +(completed<12?'COMPLETE ALL GROUPS ('+completed+'/12)':'🚀  SUBMIT MY PICKS')+'</button></div>';
+}
+
+/* ── HTML: GROUP PICKER (shared) ── */
+function buildGroupPicker(g,picks,mode,noWrapper){
+  var done=picks.length===2;
+  var inner='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<span style="background:#0f172a;color:white;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:1px">GROUP '+g+'</span>'
+    +'<span style="font-size:11px;font-weight:700;color:'+(done?'#059669':'#94a3b8')+';letter-spacing:.5px">'+(done?'✓ COMPLETE':picks.length+'/2 PICKED')+'</span>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +GROUPS[g].map(function(team){
+      var pos=picks.indexOf(team),is1=pos===0,is2=pos===1,dis=pos===-1&&picks.length>=2;
+      var bg=is1?'#fffbeb':is2?'#eef2ff':dis?'#f8fafc':'white';
+      var border=is1?'#d97706':is2?'#4f46e5':'#e2e8f0';
+      var color=is1?'#92400e':is2?'#312e81':dis?'#cbd5e1':'#334155';
+      var badge=is1?'<span style="font-size:9px;font-weight:800;color:#d97706;white-space:nowrap;flex-shrink:0">1ST🥇</span>':is2?'<span style="font-size:9px;font-weight:800;color:#4f46e5;white-space:nowrap;flex-shrink:0">2ND🥈</span>':'';
+      return '<button data-action="'+mode+'" data-g="'+g+'" data-t="'+esc(team)+'" class="tbtn"'+(dis?' disabled':'')+' style="display:flex;align-items:center;gap:5px;padding:8px 10px;border-radius:8px;border:2px solid '+border+';background:'+bg+';color:'+color+';cursor:'+(dis?'not-allowed':'pointer')+';font-family:inherit;font-weight:600;font-size:11px;text-align:left;width:100%">'
+        +'<span style="font-size:16px;line-height:1;flex-shrink:0">'+FLAGS[team]+'</span>'
+        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2">'+esc(team)+'</span>'
+        +badge+'</button>';
+    }).join('')
+    +'</div>'
+    +(done?'<div style="margin-top:6px;font-size:10px;font-weight:700;color:#059669;letter-spacing:.3px">🏆 '+FLAGS[picks[0]]+' '+esc(picks[0])+'  ·  🥈 '+FLAGS[picks[1]]+' '+esc(picks[1])+'</div>':'');
+  if(noWrapper)return inner;
+  return '<div style="'+card()+';border:'+(done?'2px solid #d1fae5':'2px solid transparent')+';transition:border .2s">'+inner+'</div>';
+}
+
+/* ── HTML: LEADERBOARD ── */
+function buildLeaderboard(){
+  var hasRes=GL.some(function(g){return S.results&&S.results.groups&&S.results.groups[g]&&S.results.groups[g].first;});
+  var tg=getTG(S.results);
+  var entries=rankEntries(S.subs,S.results);
+  var medals=['🥇','🥈','🥉'];
+  var html='<div class="fade">'
+    +'<div style="'+card()+';background:'+(hasRes?'#d1fae5':'#fef3c7')+';border:none;margin-bottom:9px"><span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+(hasRes?'#065f46':'#92400e')+'">'+(hasRes?'✅ RESULTS ARE LIVE · Ties broken by closest goals guess · Then earlier submission':'⏳ AWAITING RESULTS — Scores appear after the group stage completes')+'</span></div>';
+  if(entries.length===0)html+='<div style="text-align:center;padding:44px;color:#94a3b8">No entries yet — be the first!</div>';
+  entries.forEach(function(s,i){
+    var isExp=S.expLb===s.id;
+    var rBg=i===0&&hasRes?'#d97706':i===1&&hasRes?'#9ca3af':i===2&&hasRes?'#b45309':'#f1f5f9';
+    var rCol=i<3&&hasRes?'white':'#64748b';
+    var rLabel=hasRes?(i<3?medals[i]:String(i+1)):'–';
+    html+='<div style="'+card()+';margin-bottom:7px;overflow:hidden;padding:0">'
+      +'<button data-action="exp-lb" data-id="'+s.id+'" style="width:100%;padding:11px 13px;display:flex;align-items:center;gap:9px;background:none;border:none;cursor:pointer;text-align:left;font-family:inherit">'
+      +'<div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+rBg+';font-size:'+(i<3&&hasRes?'15':'11')+'px;font-weight:800;color:'+rCol+'">'+rLabel+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s.entryName)+'</div>'
+      +'<div style="font-size:10px;color:#94a3b8;margin-top:1px">'+esc(s.participantName)+' · '+new Date(s.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div></div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +(hasRes?'<span style="font-size:20px;font-weight:900;color:#059669">'+s.score+'</span><span style="font-size:11px;font-weight:600;color:#94a3b8">/156</span>':'<span style="font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:.5px">PENDING</span>')
+      +(tg!=null?'<div style="font-size:9px;color:#94a3b8;margin-top:1px">TB:'+s.tiebreaker+' <span style="color:'+(s.tbDiff===0?'#059669':s.tbDiff<=5?'#d97706':'#94a3b8')+'">±'+s.tbDiff+'</span></div>':'')
+      +'</div><span style="color:#94a3b8;font-size:9px;flex-shrink:0;margin-left:4px">'+(isExp?'▲':'▼')+'</span></button>'
+      +(isExp?buildPickBreakdown(s.picks,s.tiebreaker,S.results):'')
+      +'</div>';
+  });
+  if(entries.length>0)html+='<div style="font-size:10px;color:#94a3b8;padding:7px 4px;line-height:1.6"><strong>Scoring:</strong> Correct winner=5 · Runner-up=3 · Winner pick finishes 2nd=3 · Both in exact order=+5 bonus · Max 156pts</div>';
+  /* Admin access */
+  html+='<div style="margin-top:22px;border-top:1px solid #e2e8f0;padding-top:14px;text-align:center">';
+  if(!S.lbAdminMode){
+    html+='<button data-action="show-admin-pw" style="background:none;border:none;color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline;font-family:inherit">⚙ Admin Access</button>';
+  }else{
+    html+='<div style="'+card()+';max-width:300px;margin:0 auto;padding:13px">'
+      +'<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:7px">ADMIN PASSWORD</div>'
+      +'<input id="a-pw" type="password" placeholder="Password..." style="'+inp()+';margin-bottom:7px" oninput="S.adminPW=this.value" onkeydown="if(event.key===\'Enter\')doTryAdmin()">'
+      +(S.adminPWErr?'<div style="color:#dc2626;font-size:10px;margin-bottom:6px">'+esc(S.adminPWErr)+'</div>':'')
+      +'<div style="display:flex;gap:6px">'
+      +'<button data-action="try-admin" style="'+btn('#0f172a')+';flex:1;padding:8px;font-size:11px">ENTER</button>'
+      +'<button data-action="cancel-admin-pw" style="'+btn('#94a3b8')+';flex:1;padding:8px;font-size:11px">CANCEL</button>'
+      +'</div></div>';
+  }
+  html+='</div></div>';
+  return html;
+}
+
+function buildPickBreakdown(picks,tiebreaker,results){
+  var hasRes=results&&results.groups&&GL.some(function(g){return results.groups[g]&&results.groups[g].first;});
+  var tg=getTG(results);
+  var html='<div style="border-top:1px solid #f1f5f9;padding:10px 13px;background:#fafafa">'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px 8px;margin-bottom:8px">';
+  GL.forEach(function(g){
+    var pp=picks[g]||[],p1=pp[0],p2=pp[1];
+    var af=results&&results.groups&&results.groups[g]&&results.groups[g].first;
+    var as_=results&&results.groups&&results.groups[g]&&results.groups[g].second;
+    var pts=hasRes&&af&&as_?groupPts(picks,g,results):null;
+    var ptsCol=pts>=13?'#059669':pts>=6?'#d97706':'#ef4444';
+    html+='<div style="background:white;border-radius:7px;padding:5px 7px;border:1px solid #e2e8f0">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:9px;font-weight:800;color:#64748b;letter-spacing:.5px"><span>GRP '+g+'</span>'
+      +(pts!=null?'<span style="color:'+ptsCol+'">'+pts+'pt</span>':'')+'</div>'
+      +(p1?pickLine(p1,'1ST',af,hasRes):'')
+      +(p2?pickLine(p2,'2ND',as_,hasRes):'')
+      +'</div>';
+  });
+  html+='</div><div style="font-size:10px;color:#64748b">⚖ TB guess: <strong>'+tiebreaker+'</strong>'
+    +(tg!=null?' · actual: '+tg+' · diff: ±'+Math.abs(tiebreaker-tg):'')+'</div></div>';
+  return html;
+}
+
+function pickLine(team,label,actual,hr){
+  var ok=hr&&actual&&team===actual,bad=hr&&actual&&team!==actual;
+  return '<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px;font-size:9px">'
+    +'<span style="font-size:8px;font-weight:800;color:'+(label==='1ST'?'#d97706':'#4f46e5')+';min-width:20px">'+label+'</span>'
+    +'<span style="font-size:12px">'+FLAGS[team]+'</span>'
+    +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(ok?'#059669':bad?'#ef4444':'#334155')+';text-decoration:'+(bad?'line-through':'none')+'">'
+    +(ok?'✓ ':bad?'✗ ':'')+esc(team)+'</span></div>';
+}
+
+/* ── HTML: ADMIN ── */
+function buildAdmin(){
+  return '<div class="fade">'
+    +'<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">'
+    +'<button data-action="back-to-lb" style="background:none;border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:11px;color:#64748b;cursor:pointer;font-family:inherit">← Back</button>'
+    +'<span style="font-size:17px;font-weight:800;letter-spacing:.5px">ADMIN PANEL</span>'
+    +'<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:800;letter-spacing:1px">⚙ ADMIN</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:7px;margin-bottom:11px">'
+    +[['results','📊 RESULTS'],['submissions','📋 ENTRIES ('+S.subs.length+')']].map(function(kl){
+      var active=S.adminTab===kl[0];
+      return '<button data-action="admin-tab" data-tab="'+kl[0]+'" style="'+btn(active?'#0f172a':'#e2e8f0')+';flex:1;padding:8px;color:'+(active?'white':'#64748b')+';font-size:11px;letter-spacing:.5px">'+kl[1]+'</button>';
+    }).join('')+'</div>'
+    +(S.adminTab==='results'?buildAdminResults():buildAdminSubmissions())+'</div>';
+}
+
+function buildAdminResults(){
+  var completed=GL.filter(function(g){return S.draftR&&S.draftR.groups&&S.draftR.groups[g]&&S.draftR.groups[g].first&&S.draftR.groups[g].second;}).length;
+  var allGoals=0;
+  if(S.draftR&&S.draftR.games){
+    GL.forEach(function(g){(S.draftR.games[g]||[]).forEach(function(m){var a=parseInt(m.s1),b=parseInt(m.s2);allGoals+=(isNaN(a)?0:a)+(isNaN(b)?0:b);});});
+  }
+  var html='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:8px 12px;margin-bottom:9px;font-size:11px;font-weight:600;color:#1e40af;letter-spacing:.5px">SELECT 1ST AND 2ND PLACE FOR EACH GROUP · '+completed+'/12 COMPLETE</div>';
+  GL.forEach(function(g){
+    var grp=(S.draftR&&S.draftR.groups&&S.draftR.groups[g])||{};
+    var picks=[grp.first,grp.second].filter(Boolean);
+    var done=picks.length===2;
+    var isExpG=S.expGame===g;
+    var games=(S.draftR&&S.draftR.games&&S.draftR.games[g])||[];
+    var grpGoals=games.reduce(function(s,m){var a=parseInt(m.s1),b=parseInt(m.s2);return s+(isNaN(a)?0:a)+(isNaN(b)?0:b);},0);
+    html+='<div style="'+card()+';padding:0;overflow:hidden;border:'+(done?'2px solid #d1fae5':'2px solid transparent')+';transition:border .2s">'
+      +'<div style="padding:12px 13px">'+buildGroupPicker(g,picks,'rpick',true)+'</div>'
+      +'<button data-action="exp-game" data-g="'+g+'" style="width:100%;padding:6px 13px;background:#f8fafc;border:none;border-top:1px solid #f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-family:inherit">'
+      +'<span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:#64748b">📅 GAME SCORES'+(grpGoals>0?' — '+grpGoals+' goals in this group':'')+'</span>'
+      +'<span style="color:#94a3b8;font-size:9px">'+(isExpG?'▲':'▼')+'</span></button>'
+      +(isExpG?buildGameScores(g,games):'')+'</div>';
+  });
+  html+='<div style="'+card()+';margin-bottom:9px;border:2px solid #fbbf24">'
+    +'<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">⚖ TIEBREAKER — ACTUAL QUALIFYING GOALS</div>'
+    +'<p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.5">Enter the total goals scored during group play by all 32 teams advancing to the knockout stage.'
+    +(allGoals>0?' <span style="color:#94a3b8">📊 Auto-sum from all game scores: <strong>'+allGoals+'</strong> total goals (all 72 games). Adjust for qualifying teams only.</span>':'')+'</p>'
+    +'<label style="'+lbl()+'">ACTUAL TOTAL GOALS BY 32 QUALIFYING TEAMS</label>'
+    +'<input id="a-totalGoals" type="number" min="0" placeholder="e.g. 85" style="'+inp()+';max-width:170px" oninput="S.draftR.totalGoals=this.value"></div>'
+    +'<button data-action="save-results" style="'+btn('#059669')+';width:100%;padding:13px;font-size:13px;letter-spacing:1px">'+(S.adminSaved?'✅  RESULTS SAVED — SCORES UPDATED':'SAVE ALL RESULTS & CALCULATE SCORES')+'</button>';
+  return html;
+}
+
+function buildGameScores(g,games){
+  var html='<div style="padding:9px 13px;border-top:1px solid #f1f5f9;display:grid;grid-template-columns:1fr 1fr;gap:7px">';
+  games.forEach(function(m,idx){
+    html+='<div style="background:#f8fafc;border-radius:7px;padding:7px 8px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:10px;font-weight:600;color:#334155">'
+      +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:43%">'+FLAGS[m.t1]+' '+(m.t1.length>8?m.t1.slice(0,8)+'…':m.t1)+'</span>'
+      +'<span style="color:#94a3b8;font-size:8px;flex-shrink:0">vs</span>'
+      +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:43%;text-align:right">'+FLAGS[m.t2]+' '+(m.t2.length>8?m.t2.slice(0,8)+'…':m.t2)+'</span>'
+      +'</div><div style="display:flex;align-items:center;gap:4px;justify-content:center">'
+      +'<input id="gs-'+g+'-'+idx+'-s1" type="number" min="0" value="'+esc(m.s1)+'" style="width:38px;border:1px solid #e2e8f0;border-radius:5px;padding:3px;text-align:center;font-size:15px;font-weight:700;font-family:inherit" oninput="S.draftR.games[\''+g+'\']['+idx+'].s1=this.value">'
+      +'<span style="color:#94a3b8;font-weight:700">:</span>'
+      +'<input id="gs-'+g+'-'+idx+'-s2" type="number" min="0" value="'+esc(m.s2)+'" style="width:38px;border:1px solid #e2e8f0;border-radius:5px;padding:3px;text-align:center;font-size:15px;font-weight:700;font-family:inherit" oninput="S.draftR.games[\''+g+'\']['+idx+'].s2=this.value">'
+      +'</div></div>';
+  });
+  return html+'</div>';
+}
+
+function buildAdminSubmissions(){
+  var entries=rankEntries(S.subs,S.results);
+  var hasRes=GL.some(function(g){return S.results&&S.results.groups&&S.results.groups[g]&&S.results.groups[g].first;});
+  var tg=getTG(S.results);
+  var html='<div style="display:flex;gap:7px;margin-bottom:9px">'
+    +'<button data-action="export-csv" style="'+btn('#1e3a5f')+';flex:1;padding:9px;font-size:11px;letter-spacing:.5px">⬇ EXPORT CSV</button>'
+    +'<button data-action="clear-all" style="'+btn('#dc2626')+';flex:1;padding:9px;font-size:11px;letter-spacing:.5px">🗑 CLEAR ALL</button></div>';
+  if(entries.length===0)html+='<div style="text-align:center;padding:40px;color:#94a3b8">No entries yet.</div>';
+  entries.forEach(function(s,i){
+    var tbDiff=tg!=null?Math.abs(Number(s.tiebreaker)-tg):null;
+    var isExp=S.expSub===s.id;
+    html+='<div style="'+card()+';margin-bottom:7px;overflow:hidden;padding:0">'
+      +'<div style="padding:10px 12px;display:flex;align-items:center;gap:8px">'
+      +'<button data-action="exp-sub" data-id="'+s.id+'" style="flex:1;display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;text-align:left;min-width:0;font-family:inherit">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:#f1f5f9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#64748b">'+(i+1)+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s.entryName)+'</div>'
+      +'<div style="font-size:9px;color:#94a3b8;margin-top:1px">'+esc(s.participantName)+' · '+esc(s.email)+'</div>'
+      +'<div style="font-size:9px;color:#94a3b8">'+new Date(s.timestamp).toLocaleString()+'</div></div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +(hasRes?'<div style="font-size:18px;font-weight:900;color:#059669">'+s.score+'<span style="font-size:10px;font-weight:600;color:#94a3b8">/156</span></div>':'')
+      +(tbDiff!=null?'<div style="font-size:9px;color:#64748b">TB:'+s.tiebreaker+' <span style="color:'+(tbDiff===0?'#059669':tbDiff<=5?'#d97706':'#94a3b8')+'">±'+tbDiff+'</span></div>':'')
+      +'</div><span style="color:#94a3b8;font-size:9px;flex-shrink:0;margin-left:4px">'+(isExp?'▲':'▼')+'</span></button>'
+      +'<button data-action="del-entry" data-id="'+s.id+'" data-name="'+esc(s.entryName)+'" data-participant="'+esc(s.participantName)+'" title="Delete this entry" style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:5px 8px;cursor:pointer;color:#dc2626;font-size:13px;flex-shrink:0;line-height:1;font-family:inherit">🗑</button>'
+      +'</div>'
+      +(isExp?buildPickBreakdown(s.picks,s.tiebreaker,S.results):'')
+      +'</div>';
+  });
+  return html;
+}
+
+/* ── STYLE HELPERS ── */
+function card(){return 'background:white;border-radius:12px;box-shadow:0 1px 5px rgba(0,0,0,.07);padding:13px 14px;margin-bottom:9px';}
+function btn(bg){return 'background:'+bg+';color:white;border:none;border-radius:9px;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px;letter-spacing:.8px;display:inline-flex;align-items:center;justify-content:center;gap:5px';}
+function inp(){return 'width:100%;border:2px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;transition:border-color .15s';}
+function lbl(){return 'font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;display:block;margin-bottom:4px';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ── EVENTS ── */
+function bindEvents(){
+  document.getElementById('root').addEventListener('click',function(e){
+    var el=e.target.closest('[data-action]');
+    if(!el)return;
+    var act=el.dataset.action;
+    if(act==='view'){S.view=el.dataset.v;S.expLb=null;render();}
+    else if(act==='pick'){doTogglePick(el.dataset.g,el.dataset.t);}
+    else if(act==='rpick'){doToggleRPick(el.dataset.g,el.dataset.t);}
+    else if(act==='submit'){doSubmit();}
+    else if(act==='new-submit'){S.submitDone=false;S.form={entryName:'',participantName:'',email:'',tiebreaker:''};S.picks=initPicks();S.submitErr='';render();}
+    else if(act==='exp-lb'){S.expLb=S.expLb===el.dataset.id?null:el.dataset.id;render();}
+    else if(act==='exp-sub'){S.expSub=S.expSub===el.dataset.id?null:el.dataset.id;render();}
+    else if(act==='exp-game'){S.expGame=S.expGame===el.dataset.g?null:el.dataset.g;render();}
+    else if(act==='show-admin-pw'){S.lbAdminMode=true;render();}
+    else if(act==='cancel-admin-pw'){S.lbAdminMode=false;S.adminPW='';S.adminPWErr='';render();}
+    else if(act==='try-admin'){doTryAdmin();}
+    else if(act==='back-to-lb'){S.view='leaderboard';render();}
+    else if(act==='admin-tab'){S.adminTab=el.dataset.tab;render();}
+    else if(act==='save-results'){doSaveResults();}
+    else if(act==='del-entry'){doDelete(el.dataset.id,el.dataset.name,el.dataset.participant);}
+    else if(act==='clear-all'){if(confirm('Delete ALL entries? Cannot be undone.'))doClearAll();}
+    else if(act==='export-csv'){doExportCSV();}
+  });
+}
+
+function doTogglePick(g,team){
+  var c=(S.picks[g]||[]).slice();
+  var i=c.indexOf(team);
+  if(i!==-1)c.splice(i,1);
+  else if(c.length<2)c.push(team);
+  S.picks[g]=c;
+  render();
+}
+
+function doToggleRPick(g,team){
+  var grp=S.draftR.groups[g];
+  var cur=[grp.first,grp.second].filter(Boolean);
+  var i=cur.indexOf(team);
+  var next;
+  if(i!==-1){next=cur.filter(function(_,j){return j!==i;});}
+  else if(cur.length<2){next=cur.concat([team]);}
+  else{next=cur;}
+  S.draftR.groups[g]={first:next[0]||null,second:next[1]||null};
+  render();
+}
+
+function doTryAdmin(){
+  if(S.adminPW===ADMIN_PW){S.view='admin';S.lbAdminMode=false;S.adminPWErr='';render();}
+  else{S.adminPWErr='Incorrect password.';render();}
+}
+window.doTryAdmin=doTryAdmin;
+
+function doSubmit(){
+  S.submitErr='';
+  var f=S.form;
+  if(!f.entryName.trim()){S.submitErr='Entry name is required.';render();return;}
+  if(!f.participantName.trim()){S.submitErr='Participant name is required.';render();return;}
+  if(!/^[^@]+@[^@]+\.[^@]+$/.test(f.email.trim())){S.submitErr='A valid email address is required.';render();return;}
+  var completed=GL.filter(function(g){return S.picks[g].length===2;}).length;
+  if(completed<12){S.submitErr='Pick 1st and 2nd place for all 12 groups. ('+completed+'/12 done)';render();return;}
+  if(f.tiebreaker===''||isNaN(Number(f.tiebreaker))||Number(f.tiebreaker)<0){S.submitErr='Enter a valid tiebreaker guess (whole number ≥ 0).';render();return;}
+  var dup=S.subs.filter(function(s){return s.entryName&&s.entryName.toLowerCase().trim()===f.entryName.toLowerCase().trim();});
+  if(dup.length>0){S.submitErr='An entry with that name already exists. Pick a different entry name.';render();return;}
+  var sub={id:String(Date.now()),entryName:f.entryName.trim(),participantName:f.participantName.trim(),email:f.email.trim(),tiebreaker:Number(f.tiebreaker),picks:JSON.parse(JSON.stringify(S.picks)),timestamp:new Date().toISOString()};
+  S.subs.push(sub);
+  writeSubs();
+  S.submitDone=true;
+  render();
+}
+
+function doSaveResults(){
+  writeResults().then(function(){
+    S.adminSaved=true;render();
+    setTimeout(function(){S.adminSaved=false;render();},2500);
+  });
+}
+
+function doDelete(id,name,participant){
+  if(!confirm('Delete entry "'+name+'"?\nParticipant: '+participant+'\nThis cannot be undone.'))return;
+  S.subs=S.subs.filter(function(s){return s.id!==id;});
+  writeSubs();
+  render();
+}
+
+function doClearAll(){
+  S.subs=[];writeSubs();render();
+}
+
+function doExportCSV(){
+  var tg=getTG(S.results);
+  var hdr=['Rank','Entry Name','Participant','Email','Score','TB Guess','TB Actual','TB Diff','Submitted'];
+  GL.forEach(function(g){hdr.push('Group '+g+' 1st','Group '+g+' 2nd');});
+  var rows=rankEntries(S.subs,S.results).map(function(s,i){
+    var row=[i+1,'"'+s.entryName+'"','"'+s.participantName+'"','"'+s.email+'"',s.score!=null?s.score:'N/A',s.tiebreaker,tg!=null?tg:'N/A',tg!=null?Math.abs(s.tiebreaker-tg):'N/A','"'+new Date(s.timestamp).toLocaleString()+'"'];
+    GL.forEach(function(g){var pp=s.picks[g]||[];row.push(pp[0]||'',pp[1]||'');});
+    return row;
+  });
+  var csv=[hdr].concat(rows).map(function(r){return r.join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='wc2026_picks.csv';a.click();
+}
+
+/* ── INIT ── */
+bindEvents();
+loadData();
+</script>
+</body>
+</html>
