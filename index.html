@@ -695,35 +695,41 @@ function buildGroupResultCard(g){
   var grp=S.results&&S.results.groups&&S.results.groups[g];
   var games=S.results&&S.results.games&&S.results.games[g];
   var hasScores=games&&games.some(function(m){return m.s1!==''&&m.s1!=null&&m.s2!==''&&m.s2!=null;});
-  var hasResult=grp&&(grp.first||grp.second);
   var isComplete=grp&&grp.first&&grp.second;
 
+  /* Determine projected finish order:
+     - If game scores exist → use calculated standings
+     - Otherwise → use initial draw order (matches FIFA's pre-tournament view) */
+  var ranked;
+  if(hasScores){
+    ranked=calcStandings(g,games).map(function(s){return{team:s.team,pts:s.pts,w:s.w,d:s.d,l:s.l};});
+  } else {
+    ranked=GROUPS[g].map(function(t){return{team:t,pts:null};});
+  }
+
   var html='<div style="'+card('padding:12px 14px;border:'+(isComplete?'2px solid #d1fae5':'2px solid transparent'))+'">';
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
-  html+='<span style="background:#0f172a;color:white;padding:3px 11px;border-radius:5px;font-size:16px;font-weight:800;letter-spacing:1px">GROUP '+g+'</span>';
-  html+='<span style="font-size:14px;font-weight:700;color:'+(isComplete?'#059669':'#94a3b8')+'">'+(isComplete?'✓':'⏳')+'</span>';
+
+  /* Header row */
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">';
+  html+='<span style="background:#0f172a;color:white;padding:3px 11px;border-radius:5px;font-size:14px;font-weight:800;letter-spacing:1px">GROUP '+g+'</span>';
+  html+='<span style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#64748b">PROJECTED FINISH</span>';
+  html+='<span style="font-size:13px;font-weight:700;color:'+(isComplete?'#059669':'#94a3b8')+'">'+(isComplete?'✓':'⏳')+'</span>';
   html+='</div>';
 
-  if(hasScores){
-    var standings=calcStandings(g,games);
-    html+='<table style="width:100%;border-collapse:collapse;font-size:16px">';
-    standings.forEach(function(s,i){
-      var isTop=i<2&&isComplete;
-      var bg=i===0&&isComplete?'#f0fdf4':i===1&&isComplete?'#eff6ff':'white';
-      var medal=i===0&&isComplete?'🥇 ':i===1&&isComplete?'🥈 ':'      ';
-      html+='<tr style="background:'+bg+';border-top:'+(i>0?'1px solid #f1f5f9':'none')+'">'
-        +'<td style="padding:5px 4px;font-weight:'+(isTop?700:400)+'">'+medal+FLAGS[s.team]+' <span style="font-size:16px">'+esc(s.team)+'</span></td>'
-        +'<td style="text-align:right;padding:5px 4px;font-weight:800;color:'+(s.pts>0?'#059669':'#94a3b8')+'">'+s.pts+'<span style="font-size:12px;font-weight:400;color:#94a3b8">pts</span></td>'
-        +'<td style="text-align:right;padding:5px 4px;font-size:13px;color:#94a3b8;white-space:nowrap">'+s.w+'W '+s.d+'D '+s.l+'L</td>'
-        +'</tr>';
-    });
-    html+='</table>';
-  } else if(hasResult){
-    if(grp.first)  html+='<div style="font-size:16px;margin-bottom:6px">🥇 '+FLAGS[grp.first]+' '+esc(grp.first)+'</div>';
-    if(grp.second) html+='<div style="font-size:16px">🥈 '+FLAGS[grp.second]+' '+esc(grp.second)+'</div>';
-  } else {
-    html+='<div style="font-size:14px;color:#94a3b8;padding:4px 0">No results yet</div>';
-  }
+  /* Ranked team rows */
+  ranked.forEach(function(r,i){
+    var advancing=i<2;
+    var medal=isComplete&&i===0?'🥇':isComplete&&i===1?'🥈':String(i+1);
+    var rowBg=advancing?(i===0?'rgba(16,185,129,.08)':'rgba(99,102,241,.07)'):'transparent';
+    var nameColor=advancing?'#0f172a':'#94a3b8';
+    var medalColor=advancing?(i===0?'#059669':'#6366f1'):'#cbd5e1';
+    html+='<div style="display:flex;align-items:center;gap:5px;padding:4px 5px;background:'+rowBg+';border-radius:7px;margin-bottom:2px">';
+    html+='<span style="font-size:11px;font-weight:900;color:'+medalColor+';width:16px;text-align:center;flex-shrink:0">'+medal+'</span>';
+    html+='<span style="font-size:15px;flex-shrink:0">'+FLAGS[r.team]+'</span>';
+    html+='<span style="font-size:12px;font-weight:'+(advancing?700:400)+';color:'+nameColor+';flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.team)+'</span>';
+    html+=(r.pts!==null?'<span style="font-size:11px;font-weight:700;color:'+(r.pts>0?'#059669':'#94a3b8')+'">'+r.pts+'pt</span>':'');
+    html+='</div>';
+  });
 
   html+='</div>';
   return html;
