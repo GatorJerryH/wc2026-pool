@@ -544,7 +544,7 @@ function buildSubmit(){
       +'<div style="font-size:64px;margin-bottom:12px">'+(S.adminEditId?'⚙️':'🎉')+'</div>'
       +'<div style="font-size:30px;font-weight:900;color:#0f172a;margin-bottom:8px">'+(S.adminEditId?'ENTRY UPDATED!':S.editId?'PICKS UPDATED!':'PICKS SUBMITTED!')+'</div>'
       +'<p style="color:#64748b;font-size:14px;margin-bottom:24px">Entry for <strong>'+esc(S.form.participantName)+'</strong> saved successfully.</p>'
-      +'<button data-action="new-submit" style="'+btn('#0f172a','padding:11px 22px;font-size:13px;margin:0 auto')+'">Submit Another Entry</button></div>';
+      +'<button data-action="view-my-entry" style="'+btn('#0f172a','padding:11px 22px;font-size:13px;margin:0 auto')+'">📝 View / Edit My Entry</button></div>';
   }
   var completed=GL.filter(function(g){var p=S.picks[g]||[];return p[0]&&p[1];}).length;
   var pct=(completed/12)*100;
@@ -909,6 +909,7 @@ function bindEvents(){
     else if(act==='export-csv'){doExportCSV();}
     else if(act==='admin-edit-entry'){doAdminEdit(el.dataset.id);}
     else if(act==='edit-lookup-toggle'){S.editLookup=!S.editLookup;S.editErr='';S.editId=null;render();}
+    else if(act==='view-my-entry'){var _me=S.subs.find(function(s){return s.email&&s.email.toLowerCase()===S.form.email.toLowerCase();});if(_me){S.editId=_me.id;S.form={entryName:_me.entryName,participantName:_me.participantName,email:_me.email,tiebreaker:_me.tiebreaker,password:_me.password||''};S.picks=JSON.parse(JSON.stringify(_me.picks));}S.submitDone=false;S.editLookup=false;render();}
     else if(act==='cancel-edit'){S.editId=null;S.editLookup=false;S.adminEditId=null;S.editErr='';S.submitErr='';S.form={entryName:'',participantName:'',email:'',tiebreaker:'',password:''};S.picks=initPicks();render();}
     else if(act==='submit-edit'){doEditLookup();}
     else if(act==='update-picks'){doUpdatePicks();}
@@ -999,7 +1000,8 @@ function doSubmit(){
   if(completed<12){S.submitErr='Pick 1st and 2nd place for all 12 groups. ('+completed+'/12 done)';render();return;}
   if(f.tiebreaker===''||isNaN(Number(f.tiebreaker))||Number(f.tiebreaker)<0){S.submitErr='Enter a valid tiebreaker guess (whole number ≥ 0).';render();return;}
   if(!f.password.trim()){S.submitErr='A password is required (you will need it to edit your picks).';render();return;}
-  if(S.subs.filter(function(s){return s.entryName&&s.entryName.toLowerCase().trim()===f.entryName.toLowerCase().trim();}).length>0){S.submitErr='An entry with that name already exists.';render();return;}
+  if(S.subs.filter(function(s){return s.email&&s.email.toLowerCase().trim()===f.email.toLowerCase().trim();}).length>0){S.submitErr='That email address already has an entry. Use \'✏️ Edit My Picks\' above to update your existing picks.';render();return;}
+  if(S.subs.filter(function(s){return s.entryName&&s.entryName.toLowerCase().trim()===f.entryName.toLowerCase().trim();}).length>0){S.submitErr='An entry with that name already exists. Please choose a different entry name.';render();return;}
   var sub={id:String(Date.now()),entryName:f.entryName.trim(),participantName:f.participantName.trim(),email:f.email.trim(),tiebreaker:Number(f.tiebreaker),password:f.password.trim(),picks:JSON.parse(JSON.stringify(S.picks)),timestamp:new Date().toISOString()};
   var entity={PartitionKey:'subs',RowKey:sub.id,entryName:sub.entryName,
     participantName:sub.participantName,email:sub.email,tiebreaker:sub.tiebreaker,
