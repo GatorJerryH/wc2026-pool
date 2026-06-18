@@ -672,6 +672,17 @@ function buildLeaderboard(){
 
   /* LEFT PANE: entry standings */
   var left='';
+  var _adminAccess='';
+  if(!S.lbAdminMode){
+    _adminAccess='<div style="text-align:center;margin-bottom:9px"><button data-action="show-admin-pw" style="background:none;border:none;color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline;font-family:inherit">⚙ Admin Access</button></div>';
+  } else {
+    _adminAccess='<div style="'+card('padding:13px;margin-bottom:9px')+'">'
+      +'<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:7px">ADMIN PASSWORD</div>'
+      +'<input id="a-pw" type="password" placeholder="Password..." style="'+inp('margin-bottom:7px')+'" oninput="S.adminPW=this.value" onkeydown="if(event.key===\'Enter\')doTryAdmin()">'
+      +(S.adminPWErr?'<div style="color:#dc2626;font-size:10px;margin-bottom:6px">'+esc(S.adminPWErr)+'</div>':'')
+      +'<div style="display:flex;gap:6px"><button data-action="try-admin" style="'+btn('#0f172a','flex:1;padding:8px;font-size:11px')+'">ENTER</button>'
+      +'<button data-action="cancel-admin-pw" style="'+btn('#94a3b8','flex:1;padding:8px;font-size:11px')+'">CANCEL</button></div></div>';
+  }
   left+=_adminAccess;
   left+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">'
     +'<div style="'+card('background:'+(hasRes?'#d1fae5':'#fef3c7')+';border:none;margin-bottom:0;flex:1')+'"><span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+(hasRes?'#065f46':'#92400e')+'">'+(hasRes?'✅ RESULTS ARE LIVE · Ties broken by closest goals guess':'⏳ AWAITING RESULTS — Scores appear after the group stage completes')+'</span></div>'
