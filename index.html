@@ -672,6 +672,7 @@ function buildLeaderboard(){
 
   /* LEFT PANE: entry standings */
   var left='';
+  left+=_adminAccess;
   left+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">'
     +'<div style="'+card('background:'+(hasRes?'#d1fae5':'#fef3c7')+';border:none;margin-bottom:0;flex:1')+'"><span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+(hasRes?'#065f46':'#92400e')+'">'+(hasRes?'✅ RESULTS ARE LIVE · Ties broken by closest goals guess':'⏳ AWAITING RESULTS — Scores appear after the group stage completes')+'</span></div>'
     +'<button data-action="refresh-lb" style="'+btn('#1e3a5f','padding:8px 14px;font-size:12px;white-space:nowrap;flex-shrink:0')+'">⟳ Refresh</button></div>';
@@ -691,18 +692,6 @@ function buildLeaderboard(){
       +(isExp?buildPickBreakdown(s.picks,s.tiebreaker,S.results):'')+'</div>';
   });
   if(entries.length>0)left+='<div style="font-size:10px;color:#94a3b8;padding:7px 4px;line-height:1.7"><strong>Scoring:</strong> Winner=5 · Runner-up=3 · Winner pick finishes 2nd=3 · Runner-up pick wins group=5 · Both in order=+5 bonus · Max 156pts</div>';
-  left+='<div style="margin-top:22px;border-top:1px solid #e2e8f0;padding-top:14px;text-align:center">';
-  if(!S.lbAdminMode){
-    left+='<button data-action="show-admin-pw" style="background:none;border:none;color:#94a3b8;font-size:10px;cursor:pointer;text-decoration:underline;font-family:inherit">⚙ Admin Access</button>';
-  } else {
-    left+='<div style="'+card('max-width:300px;margin:0 auto;padding:13px')+'">'
-      +'<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:7px">ADMIN PASSWORD</div>'
-      +'<input id="a-pw" type="password" placeholder="Password..." style="'+inp('margin-bottom:7px')+'" oninput="S.adminPW=this.value" onkeydown="if(event.key===\'Enter\')doTryAdmin()">'
-      +(S.adminPWErr?'<div style="color:#dc2626;font-size:10px;margin-bottom:6px">'+esc(S.adminPWErr)+'</div>':'')
-      +'<div style="display:flex;gap:6px"><button data-action="try-admin" style="'+btn('#0f172a','flex:1;padding:8px;font-size:11px')+'">ENTER</button>'
-      +'<button data-action="cancel-admin-pw" style="'+btn('#94a3b8','flex:1;padding:8px;font-size:11px')+'">CANCEL</button></div></div>';
-  }
-  left+='</div>';
 
   /* RIGHT PANE: group results */
   var right='<div style="font-size:16px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:10px;padding:4px 0">GROUP RESULTS</div>';
