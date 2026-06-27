@@ -42,7 +42,7 @@ button:focus{outline:none}
      Pick 2 = actual 1st  → 5 pts  (picked as runner-up, but they won!)
      Both correct in exact order → +5 bonus
      Max per group: 13 pts | Max total: 156 pts
-   Tiebreaker: closest to total goals by 32 qualifying teams
+   Tiebreaker: closest to total goals scored by the top 2 finishers in each group (24 teams)
 ═══════════════════════════════════════════════════════ */
 
 var GROUPS={A:["Mexico","South Korea","South Africa","Czechia"],B:["Canada","Switzerland","Qatar","Bosnia-Herzegovina"],C:["Brazil","Morocco","Scotland","Haiti"],D:["USA","Paraguay","Australia","Turkey"],E:["Germany","Curaçao","Ivory Coast","Ecuador"],F:["Netherlands","Japan","Tunisia","Sweden"],G:["Belgium","Egypt","Iran","New Zealand"],H:["Spain","Cape Verde","Saudi Arabia","Uruguay"],I:["France","Senegal","Norway","Iraq"],J:["Argentina","Algeria","Austria","Jordan"],K:["Portugal","Colombia","Uzbekistan","DR Congo"],L:["England","Croatia","Ghana","Panama"]};
@@ -144,13 +144,13 @@ S.picks=initPicks();
 
 /* ── RESULTS HELPERS ── */
 function makeMatchups(g){var t=GROUPS[g],m=[];for(var i=0;i<4;i++)for(var j=i+1;j<4;j++)m.push({t1:t[i],t2:t[j],s1:"",s2:""});return m;}
-function initResults(){var groups={},games={};GL.forEach(function(g){groups[g]={first:null,second:null};games[g]=makeMatchups(g);});return{groups:groups,games:games,totalGoals:""};}
+function initResults(){var groups={},games={};GL.forEach(function(g){groups[g]={first:null,second:null};games[g]=makeMatchups(g);});return{groups:groups,games:games,totalGoals:"",thirdPlaceQualifiers:[]};}
 function loadResults(raw){
   if(!raw)return initResults();
   if(!raw.groups){var r=initResults();GL.forEach(function(g){if(raw[g])r.groups[g]={first:raw[g][0]||null,second:raw[g][1]||null};});return r;}
   var base=initResults();
   GL.forEach(function(g){if(raw.groups[g])base.groups[g]=raw.groups[g];if(raw.games&&raw.games[g])base.games[g]=raw.games[g];});
-  base.totalGoals=raw.totalGoals||"";return base;
+  base.totalGoals=raw.totalGoals||"";base.thirdPlaceQualifiers=raw.thirdPlaceQualifiers||[];return base;
 }
 
 /* ── SCORING ──
@@ -184,7 +184,50 @@ function groupPts(picks,g,results){
   if(p1===af&&p2===as_)pts+=5;
   return pts;
 }
-function getTG(results){if(results&&results.totalGoals!=null&&results.totalGoals!=="")return Number(results.totalGoals);return null;}
+function getThirdPlaceTeams(results){
+  /* Return array of {group,team,pts,gd,gf,w,d,l} for the 3rd place team in each group */
+  var teams=[];
+  GL.forEach(function(g){
+    var gms=results&&results.games&&results.games[g];
+    var hasScores=gms&&gms.some(function(m){return m.s1!==''&&m.s1!=null;});
+    if(hasScores){
+      var st=calcStandings(g,gms);
+      if(st.length>=3)teams.push({group:g,team:st[2].team,pts:st[2].pts,gd:st[2].gd,gf:st[2].gf,w:st[2].w,d:st[2].d,l:st[2].l,hasData:true});
+      else teams.push({group:g,team:GROUPS[g][2],pts:null,gf:null,hasData:false});
+    } else {
+      teams.push({group:g,team:GROUPS[g][2],pts:null,gf:null,hasData:false});
+    }
+  });
+  return teams;
+}
+function getTG(results){
+  /* Auto-calculate: sum of GF for 1st+2nd from each group PLUS GF for qualifying 3rd place teams */
+  if(results&&results.games){
+    var total=0,allDone=true;
+    /* Top 2 from each group */
+    GL.forEach(function(g){
+      var gms=results.games[g];
+      var hasAll=gms&&gms.every(function(m){return m.s1!==''&&m.s1!=null&&m.s2!==''&&m.s2!=null;});
+      if(!hasAll){allDone=false;return;}
+      var st=calcStandings(g,gms);
+      if(st.length>=2){total+=st[0].gf+st[1].gf;}else{allDone=false;}
+    });
+    /* Add qualifying 3rd place teams' goals */
+    var q3=results.thirdPlaceQualifiers||[];
+    if(q3.length===8&&allDone){
+      var t3=getThirdPlaceTeams(results);
+      q3.forEach(function(teamName){
+        var entry=t3.find(function(x){return x.team===teamName;});
+        if(entry&&entry.gf!=null)total+=entry.gf;
+        else allDone=false;
+      });
+      if(allDone)return total;
+    }
+  }
+  /* Fall back to manual admin entry if scores or qualifiers incomplete */
+  if(results&&results.totalGoals!=null&&results.totalGoals!=="")return Number(results.totalGoals);
+  return null;
+}
 function rankEntries(subs,results){
   var tg=getTG(results);
   return subs.slice().map(function(s){return Object.assign({},s,{score:calcScore(s.picks,results),tbDiff:tg!=null?Math.abs(Number(s.tiebreaker)-tg):null});})
@@ -621,7 +664,7 @@ function buildSubmit(){
     /* Tiebreaker */
     +'<div style="'+card('border:2px solid #fbbf24')+'">'
     +'<div style="font-size:16px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">⚖ TIEBREAKER</div>'
-    +'<p style="font-size:16px;color:#64748b;margin-bottom:9px;line-height:1.5">How many total goals will be scored <em>during group play</em> by the <strong>32 teams that qualify for the knockout stage</strong>?</p>'
+    +'<p style="font-size:16px;color:#64748b;margin-bottom:9px;line-height:1.5">How many total goals will be scored <em>during group play</em> by the <strong>32 teams that qualify for the knockout stage</strong>? (top 2 from each group + the 8 best 3rd place finishers)</p>'
     +'<label style="font-size:16px;font-weight:700;letter-spacing:1.5px;color:#64748b;display:block;margin-bottom:4px">YOUR GUESS <span style="color:#dc2626">*</span></label>'
     +'<input id="f-tiebreaker" type="number" min="0" placeholder="e.g. 85" style="'+inp('max-width:160px;font-size:16px')+'" oninput="S.form.tiebreaker=this.value">'
     +'<div style="font-size:14px;color:#94a3b8;margin-top:4px">Closest guess breaks ties. Earlier submission wins if still tied.</div>'
@@ -828,11 +871,11 @@ function buildAdminResults(){
       +(isExpG?buildGameScores(g,games):'')+'</div>';
   });
   html+='<div style="'+card('border:2px solid #fbbf24')+'">'
-    +'<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">⚖ TIEBREAKER — ACTUAL QUALIFYING GOALS</div>'
-    +'<p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.5">Total goals scored during group play by all 32 teams advancing to the knockout stage.'
-    +(allGoals>0?' <span style="color:#94a3b8">📊 All game scores sum: <strong>'+allGoals+'</strong> goals.</span>':'')+'</p>'
-    +'<label style="'+lbl()+'">ACTUAL TOTAL GOALS BY 32 QUALIFYING TEAMS</label>'
-    +'<input id="a-totalGoals" type="number" min="0" placeholder="e.g. 85" style="'+inp('max-width:170px')+'" oninput="S.draftR.totalGoals=this.value"></div>'
+    +'<div style="'+card('padding:14px;margin-bottom:0')+'">'    +'<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">🥉 3RD PLACE QUALIFIERS'    +'<span style="font-size:10px;font-weight:600;color:'+((_q3=S.draftR.thirdPlaceQualifiers||[]).length===8?'#059669':'#dc2626')+'">&nbsp;&nbsp;'+_q3.length+'/8 selected</span></div>'    +'<p style="font-size:11px;color:#64748b;margin-bottom:10px">Select the 8 third-place teams that advance to the knockout stage. Their goals will be included in the tiebreaker total.</p>'    +(function(){      var _t3=getThirdPlaceTeams(S.draftR);      var _q3=S.draftR.thirdPlaceQualifiers||[];      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'        +_t3.map(function(t){          var sel=_q3.indexOf(t.team)>=0;          var bg=sel?'#f0fdf4':'#f8fafc';          var border=sel?'2px solid #059669':'2px solid #e2e8f0';          var locked=!t.hasData;          return '<div data-action="toggle-3rd" data-team="'+t.team+'" style="background:'+bg+';border:'+border+';border-radius:8px;padding:7px 10px;cursor:'+(locked?'default':'pointer')+';display:flex;align-items:center;gap:6px">'            +'<span style="font-size:10px;font-weight:800;color:#64748b;min-width:14px;">'+t.group+'</span>'            +'<span style="font-size:16px">'+FLAGS[t.team]+'</span>'            +'<span style="font-size:11px;font-weight:'+(sel?800:400)+';color:'+(sel?'#059669':'#334155')+';flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.team)+'</span>'            +(t.hasData?'<span style="font-size:10px;color:#64748b">'+t.pts+'pt</span>':'')            +(sel?'<span style="font-size:12px">✓</span>':'')+'</div>';        }).join('')        +'</div>';    })()    +'</div>'    +'<div style="'+card('padding:14px;margin-bottom:0')+'">'    +'<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#0f172a;margin-bottom:4px">⚖ TIEBREAKER — TOP 2 FINISHER GOALS</div>'
+    +'<p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.5">Total goals scored during group play by the <strong>1st and 2nd place finisher from each of the 12 groups</strong> (24 teams combined). Auto-calculated once all scores are entered.</p>'
+    +(getTG(S.draftR)!=null?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;font-weight:700;color:#059669">✓ Auto-calculated: <strong>'+getTG(S.draftR)+'</strong> goals (top 2 finishers across all 12 groups)</div>':'')
+    +'<label style="'+lbl()+'">MANUAL OVERRIDE (if needed)</label>'
+    +'<input id="a-totalGoals" type="number" min="0" placeholder="Auto-calculated when scores complete" style="'+inp('max-width:250px')+'" oninput="S.draftR.totalGoals=this.value"></div>'
     +'<div style="position:sticky;bottom:0;z-index:50;padding:10px 0 4px;background:linear-gradient(to bottom,transparent 0%,white 30%)">'
     +'<button data-action="save-results" style="'+btn(S.adminSaved?'#059669':'#0f172a','width:100%;padding:13px;font-size:13px;letter-spacing:1px')+'">'+(S.adminSaved?'✅  RESULTS SAVED — SCORES UPDATED':'💾  SAVE ALL RESULTS & CALCULATE SCORES')+'</button>'
     +'</div>';
@@ -913,6 +956,7 @@ function bindEvents(){
     else if(act==='cancel-edit'){S.editId=null;S.editLookup=false;S.adminEditId=null;S.editErr='';S.submitErr='';S.form={entryName:'',participantName:'',email:'',tiebreaker:'',password:''};S.picks=initPicks();render();}
     else if(act==='submit-edit'){doEditLookup();}
     else if(act==='update-picks'){doUpdatePicks();}
+    else if(act==='toggle-3rd'){var _tn=el.dataset.team;var _q=S.draftR.thirdPlaceQualifiers||[];var _idx=_q.indexOf(_tn);if(_idx>=0){_q.splice(_idx,1);}else if(_q.length<8){_q.push(_tn);}S.draftR.thirdPlaceQualifiers=_q;azUpsert('results',{PartitionKey:'results',RowKey:'main',data:JSON.stringify(S.draftR)});render();}
   });
 }
 
